@@ -1,14 +1,15 @@
-using Microsoft.EntityFrameworkCore;
 using Blazor_Serial_Test.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DB 연결
+// Razor Components (Server)
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+// EF Core
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Razor Components
-builder.Services.AddRazorComponents();
 
 var app = builder.Build();
 
@@ -20,8 +21,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseRouting();
+app.UseAntiforgery();
 
-app.MapRazorComponents<App>();
+app.MapRazorComponents<Blazor_Serial_Test.Components.App>()
+   .AddInteractiveServerRenderMode();
 
 app.Run();
