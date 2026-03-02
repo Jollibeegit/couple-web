@@ -1,0 +1,142 @@
+@page "/schedules"
+@using Blazor_Serial_Test.Models
+@using Blazor_Serial_Test.Services
+@using Blazor_Serial_Test.Components.Shared
+@inject CoupleDataService DataService
+@implements IDisposable
+
+<PageTitle>일정 관리</PageTitle>
+
+<h1>📅 일정 관리</h1>
+
+<h2 class="mt-4 mb-3">캘린더</h2>
+<CalendarView ShowSchedules="true" ShowMemos="false" ShowAnniversaries="false" OnDateSelected="HandleDateSelected" />
+
+<h2 class="mt-5 mb-3">일정 목록</h2>
+
+<div class="row mb-3">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="ShowAddForm">새 일정 추가</button>
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@(editingSchedule?.Id != Guid.Empty ? "일정 수정" : "새 일정")</h5>
+            <div class="mb-3">
+                <label class="form-label">제목</label>
+                <input type="text" class="form-control" @bind="currentSchedule.Title" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">설명</label>
+                <textarea class="form-control" @bind="currentSchedule.Description" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">날짜</label>
+                <input type="date" class="form-control" @bind="currentSchedule.Date" />
+            </div>
+            <button class="btn btn-success" @onclick="SaveSchedule">저장</button>
+            <button class="btn btn-secondary" @onclick="CancelForm">취소</button>
+        </div>
+    </div>
+}
+
+<div class="list-group">
+    @foreach (var schedule in schedules)
+    {
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">@schedule.Title</h5>
+                <small>@schedule.Date.ToString("yyyy-MM-dd")</small>
+            </div>
+            <p class="mb-1">@schedule.Description</p>
+            <div class="mt-2">
+                <button class="btn btn-sm btn-warning" @onclick="() => EditSchedule(schedule)">수정</button>
+                <button class="btn btn-sm btn-danger" @onclick="() => DeleteSchedule(schedule.Id)">삭제</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Schedule> schedules = new();
+    private Schedule currentSchedule = new();
+    private Schedule? editingSchedule;
+    private bool showForm = false;
+
+    protected override void OnInitialized()
+    {
+        schedules = DataService.GetSchedules();
+        DataService.OnChange += OnDataChanged;
+    }
+
+    private void OnDataChanged()
+    {
+        schedules = DataService.GetSchedules();
+        StateHasChanged();
+    }
+
+    private void HandleDateSelected(DateTime date)
+    {
+        currentSchedule = new Schedule { Date = date };
+        editingSchedule = null;
+        showForm = true;
+    }
+
+    private void ShowAddForm()
+    {
+        currentSchedule = new Schedule();
+        editingSchedule = null;
+        showForm = true;
+    }
+
+    private void EditSchedule(Schedule schedule)
+    {
+        editingSchedule = schedule;
+        currentSchedule = new Schedule
+        {
+            Id = schedule.Id,
+            Title = schedule.Title,
+            Description = schedule.Description,
+            Date = schedule.Date,
+            CreatedAt = schedule.CreatedAt
+        };
+        showForm = true;
+    }
+
+    private void SaveSchedule()
+    {
+        if (string.IsNullOrWhiteSpace(currentSchedule.Title))
+            return;
+
+        if (editingSchedule != null)
+        {
+            DataService.UpdateSchedule(currentSchedule);
+        }
+        else
+        {
+            DataService.AddSchedule(currentSchedule);
+        }
+
+        CancelForm();
+    }
+
+    private void DeleteSchedule(Guid id)
+    {
+        DataService.DeleteSchedule(id);
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        currentSchedule = new();
+        editingSchedule = null;
+    }
+
+    public void Dispose()
+    {
+        DataService.OnChange -= OnDataChanged;
+    }
+}

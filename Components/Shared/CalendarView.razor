@@ -1,0 +1,328 @@
+@using Blazor_Serial_Test.Models
+@using Blazor_Serial_Test.Services
+@inject CoupleDataService DataService
+@implements IDisposable
+
+<div class="calendar-controls mb-2 compact">
+    <div class="row align-items-center g-2 flex-nowrap">
+        <div class="col-auto">
+            <button class="btn btn-outline-primary btn-sm" @onclick="PreviousMonth">◀ 이전 달</button>
+        </div>
+        <div class="col text-center">
+            <h3 class="mb-0 fs-5">@currentDate.ToString("yyyy년 MM월")</h3>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-outline-primary btn-sm" @onclick="NextMonth">다음 달 ▶</button>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary btn-sm" @onclick="GoToToday">오늘</button>
+        </div>
+    </div>
+</div>
+
+<div class="calendar-grid">
+    <div class="calendar-header">
+        <div class="calendar-day-header sunday">일</div>
+        <div class="calendar-day-header">월</div>
+        <div class="calendar-day-header">화</div>
+        <div class="calendar-day-header">수</div>
+        <div class="calendar-day-header">목</div>
+        <div class="calendar-day-header">금</div>
+        <div class="calendar-day-header saturday">토</div>
+    </div>
+    
+    <div class="calendar-body">
+        @foreach (var week in GetCalendarWeeks())
+        {
+            <div class="calendar-week">
+                @foreach (var day in week)
+                {
+                    var isToday = day.Date == DateTime.Today;
+                    var isCurrentMonth = day.Date.Month == currentDate.Month;
+                    var isSelected = selectedDate.HasValue && day.Date.Date == selectedDate.Value.Date;
+                    var dayClass = $"calendar-day {(isToday ? "today" : "")} {(!isCurrentMonth ? "other-month" : "")} {(day.Date.DayOfWeek == DayOfWeek.Sunday ? "sunday" : "")} {(day.Date.DayOfWeek == DayOfWeek.Saturday ? "saturday" : "")} {(isSelected ? "selected" : "")}";
+                    
+                    <div class="@dayClass" @onclick="() => OnDateClicked(day.Date)">
+                        <div class="day-number">@day.Date.Day</div>
+                        <div class="day-events">
+                            @if (ShowSchedules)
+                            {
+                                @foreach (var schedule in day.Schedules)
+                                {
+                                    <div class="event schedule-event" title="@schedule.Title">📅 @schedule.Title</div>
+                                }
+                            }
+                            @if (ShowMemos)
+                            {
+                                @foreach (var memo in day.Memos)
+                                {
+                                    <div class="event memo-event" title="@memo.Title">📝 @memo.Title</div>
+                                }
+                            }
+                            @if (ShowAnniversaries)
+                            {
+                                @foreach (var anniversary in day.Anniversaries)
+                                {
+                                    <div class="event anniversary-event" title="@anniversary.Title">💕 @anniversary.Title</div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .calendar-grid {
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        overflow: hidden;
+        padding: 8px;
+    }
+
+    .calendar-header {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        background-color: #fde2e4;
+        border-bottom: 2px solid #e8ccd0;
+    }
+
+    .calendar-day-header {
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        color: #111;
+    }
+
+    .calendar-day-header.sunday {
+        color: #dc3545;
+    }
+
+    .calendar-day-header.saturday {
+        color: #0d6efd;
+    }
+
+    .calendar-week {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .calendar-week:last-child {
+        border-bottom: none;
+    }
+
+    .calendar-day {
+        min-height: 90px;
+        padding: 6px;
+        border-right: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .calendar-day:hover {
+        background-color: #f8f9fa;
+    }
+
+    .calendar-day:nth-child(7n) {
+        border-right: none;
+    }
+
+    .calendar-day.today {
+        background-color: #f6d365;
+    }
+
+    .calendar-day.today .day-number {
+        color: #1f2933;
+    }
+
+    .calendar-day.other-month {
+        background-color: #c7c7c7;
+        opacity: 1;
+    }
+
+    .calendar-day.other-month .day-number {
+        color: #111;
+        opacity: 0.9;
+    }
+
+    .calendar-day.other-month.sunday .day-number {
+        color: #dc3545;
+    }
+
+    .calendar-day.other-month.saturday .day-number {
+        color: #0d6efd;
+    }
+
+    .calendar-day.selected {
+        background-color: #d9d9d9;
+        color: #111;
+        opacity: 1;
+    }
+
+    .calendar-day.selected .day-number,
+    .calendar-day.selected .event {
+        color: #111;
+    }
+
+    .calendar-day.selected .event {
+        background: #f1f3f5;
+    }
+
+    .calendar-day.sunday .day-number {
+        color: #dc3545;
+    }
+
+    .calendar-day.saturday .day-number {
+        color: #0d6efd;
+    }
+
+    .day-number {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .day-events {
+        font-size: 0.75rem;
+    }
+
+    .event {
+        padding: 2px 4px;
+        margin-bottom: 2px;
+        border-radius: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .schedule-event {
+        background-color: #e9ecef;
+        color: #343a40;
+    }
+
+    .memo-event {
+        background-color: #cfe2ff;
+        color: #084298;
+    }
+
+    .anniversary-event {
+        background-color: transparent;
+        color: #dc3545;
+        font-weight: 700;
+    }
+</style>
+
+@code {
+    [Parameter] public bool ShowSchedules { get; set; } = true;
+    [Parameter] public bool ShowMemos { get; set; } = true;
+    [Parameter] public bool ShowAnniversaries { get; set; } = true;
+    [Parameter] public EventCallback<DateTime> OnDateSelected { get; set; }
+    [Parameter] public DateTime? SelectedDate { get; set; }
+
+    private DateTime currentDate = DateTime.Today;
+    private DateTime? selectedDate;
+    private List<Schedule> allSchedules = new();
+    private List<Memo> allMemos = new();
+    private List<Anniversary> allAnniversaries = new();
+
+    public class CalendarDay
+    {
+        public DateTime Date { get; set; }
+        public List<Schedule> Schedules { get; set; } = new();
+        public List<Memo> Memos { get; set; } = new();
+        public List<Anniversary> Anniversaries { get; set; } = new();
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+        DataService.OnChange += OnDataChanged;
+    }
+
+    private void LoadData()
+    {
+        allSchedules = DataService.GetSchedules();
+        allMemos = DataService.GetMemos();
+        allAnniversaries = DataService.GetAnniversaries();
+    }
+
+    private void OnDataChanged()
+    {
+        LoadData();
+        StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        selectedDate = SelectedDate;
+    }
+
+    private List<List<CalendarDay>> GetCalendarWeeks()
+    {
+        var weeks = new List<List<CalendarDay>>();
+        var firstDayOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
+        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+        
+        var startDate = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek);
+        var endDate = lastDayOfMonth.AddDays(6 - (int)lastDayOfMonth.DayOfWeek);
+        
+        var currentWeek = new List<CalendarDay>();
+        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            var day = new CalendarDay { Date = date };
+            
+            if (ShowSchedules)
+                day.Schedules = allSchedules.Where(s => s.Date.Date == date.Date).ToList();
+            
+            if (ShowMemos)
+                day.Memos = allMemos.Where(m => m.CreatedAt.Date == date.Date).ToList();
+            
+            if (ShowAnniversaries)
+                day.Anniversaries = allAnniversaries.Where(a => 
+                    a.Date.Date == date.Date || 
+                    (a.IsRecurring && a.Date.Month == date.Month && a.Date.Day == date.Day)
+                ).ToList();
+            
+            currentWeek.Add(day);
+            
+            if (currentWeek.Count == 7)
+            {
+                weeks.Add(currentWeek);
+                currentWeek = new List<CalendarDay>();
+            }
+        }
+        
+        return weeks;
+    }
+
+    private void PreviousMonth()
+    {
+        currentDate = currentDate.AddMonths(-1);
+        StateHasChanged();
+    }
+
+    private void NextMonth()
+    {
+        currentDate = currentDate.AddMonths(1);
+        StateHasChanged();
+    }
+
+    private void GoToToday()
+    {
+        currentDate = DateTime.Today;
+        StateHasChanged();
+    }
+
+    private async Task OnDateClicked(DateTime date)
+    {
+        selectedDate = date; // Keeping selection consistent with parent
+        await OnDateSelected.InvokeAsync(date);
+    }
+
+    public void Dispose()
+    {
+        DataService.OnChange -= OnDataChanged;
+    }
+}

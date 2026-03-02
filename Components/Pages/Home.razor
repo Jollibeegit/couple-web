@@ -1,0 +1,273 @@
+﻿@page "/"
+@using Blazor_Serial_Test.Models
+@using Blazor_Serial_Test.Services
+@using Blazor_Serial_Test.Components.Shared
+@inject CoupleDataService DataService
+@implements IDisposable
+
+<PageTitle>홈</PageTitle>
+
+<!-- ✅ 커플앱 헤더(감성 + D-Day + 다음 기념일) -->
+<div class="couple-hero mb-4">
+    <div class="hero-top">
+        <div class="couple-profiles">
+            <div class="avatar">운</div>
+            <div class="heart-chip">❤</div>
+            <div class="avatar">학</div>
+        </div>
+
+        <!-- 설정 페이지가 없으면 이 버튼은 지워도 됨 -->
+        <a class="btn btn-outline-light" href="/settings">설정</a>
+    </div>
+
+<h1 class="hero-title"><span class="hero-name">운진</span> <span class="hero-heart">❤</span> <span class="hero-name">학규</span></h1>
+<p class="hero-sub">우리의 소중한 순간들을 함께 기록하고 공유해보세요.</p>
+
+    <div class="hero-badges">
+        <div class="badge-pill badge-love">사귄지 <strong class="badge-dcount">D+@(GetLoveDays())</strong></div>
+        @if (nextAnniversary != null)
+        {
+            <div class="badge-pill badge-next">다음 기념일 <strong class="badge-dcount">D-@nextAnniversary.DaysUntil()</strong></div>
+        }
+        <div class="badge-pill badge-today">오늘 <strong>@DateTime.Today.ToString("MM/dd")</strong></div>
+    </div>
+
+    <div class="hero-stats">
+        <a class="stat-chip" href="/schedules">
+            <span class="label">📅 다가오는 일정</span>
+            <span class="value">@upcomingSchedules</span>
+        </a>
+        <a class="stat-chip" href="/memos">
+            <span class="label">📝 메모</span>
+            <span class="value">@totalMemos</span>
+        </a>
+        <a class="stat-chip" href="/anniversaries">
+            <span class="label">💕 기념일</span>
+            <span class="value">@totalAnniversaries</span>
+        </a>
+    </div>
+</div>
+
+<!-- ✅ 캘린더 카드(중복 div/깨진 구조 전부 정리) -->
+<div class="card glass mb-3 p-3 p-md-4 calendar-card">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 type-actions">
+        <div>
+            <h2 class="mb-1">📆 이번 달 캘린더</h2>
+            <p class="text-muted mb-1">원하는 구분을 선택하고 날짜를 눌러 바로 등록하세요.</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 type-buttons justify-content-center">
+            <div class="btn-group" role="group">
+                <button class="btn btn-type btn-memo @(selectedType == "Memo" ? "active" : string.Empty)"
+                        @onclick='() => SelectType("Memo")'>
+                    메모
+                </button>
+
+                <button class="btn btn-type btn-anniversary @(selectedType == "Anniversary" ? "active" : string.Empty)"
+                        @onclick='() => SelectType("Anniversary")'>
+                    기념일
+                </button>
+
+                <button class="btn btn-type btn-schedule @(selectedType == "Schedule" ? "active" : string.Empty)"
+                        @onclick='() => SelectType("Schedule")'>
+                    일정
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3 calendar-wrapper">
+        <CalendarView ShowSchedules="true"
+                      ShowMemos="true"
+                      ShowAnniversaries="true"
+                      OnDateSelected="HandleDateSelected"
+                      SelectedDate="selectedDate" />
+    </div>
+</div>
+
+@if (nextAnniversary != null)
+{
+    <div class="alert next-anni mb-4" role="alert">
+        <h4 class="alert-heading">🎉 다음 기념일</h4>
+        <p class="mb-0"><strong>@nextAnniversary.Title</strong> - D-@nextAnniversary.DaysUntil()</p>
+    </div>
+}
+
+<!-- ✅ 등록 모달 -->
+@if (showForm && selectedDate.HasValue)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.55);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@selectedDate.Value.ToString("yyyy년 MM월 dd일") @GetTypeLabel()</h5>
+                    <button type="button" class="btn-close" @onclick="CancelForm"></button>
+                </div>
+
+                <div class="modal-body">
+                    @if (selectedType == "Memo")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">제목</label>
+                            <input type="text" class="form-control" @bind="homeMemo.Title" placeholder="예) 오늘 데이트 기록" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">내용</label>
+                            <textarea class="form-control" @bind="homeMemo.Content" rows="4" placeholder="짧게라도 남겨두면 나중에 좋아요."></textarea>
+                        </div>
+                    }
+                    else if (selectedType == "Schedule")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">제목</label>
+                            <input type="text" class="form-control" @bind="homeSchedule.Title" placeholder="예) 저녁 약속" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">설명</label>
+                            <textarea class="form-control" @bind="homeSchedule.Description" rows="4" placeholder="장소/시간/메모"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">날짜</label>
+                            <input type="date" class="form-control" @bind="homeSchedule.Date" />
+                        </div>
+                    }
+                    else if (selectedType == "Anniversary")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">제목</label>
+                            <input type="text" class="form-control" @bind="homeAnniversary.Title" placeholder="예) 100일" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">날짜</label>
+                            <input type="date" class="form-control" @bind="homeAnniversary.Date" />
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="homeAnniversary.IsRecurring" id="homeRecurring" />
+                            <label class="form-check-label" for="homeRecurring">매년 반복</label>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-outline-light" @onclick="CancelForm">취소</button>
+                    <button class="btn btn-primary" @onclick="SaveItem">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int upcomingSchedules;
+    private int totalMemos;
+    private int totalAnniversaries;
+    private Anniversary? nextAnniversary;
+    private DateTime? selectedDate;
+
+    private Memo homeMemo = new();
+    private Schedule homeSchedule = new();
+    private Anniversary homeAnniversary = new();
+
+    private bool showForm;
+    private string selectedType = "Memo";
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+        DataService.OnChange += OnDataChanged;
+    }
+
+    private void LoadData()
+    {
+        upcomingSchedules = DataService.GetSchedules()
+            .Count(s => s.Date >= DateTime.Today);
+
+        totalMemos = DataService.GetMemos().Count;
+        totalAnniversaries = DataService.GetAnniversaries().Count;
+
+        nextAnniversary = DataService.GetAnniversaries()
+            .Where(a => a.DaysUntil() >= 0)
+            .OrderBy(a => a.DaysUntil())
+            .FirstOrDefault();
+    }
+
+    private void OnDataChanged()
+    {
+        LoadData();
+        StateHasChanged();
+    }
+
+    private void HandleDateSelected(DateTime date)
+    {
+        selectedDate = date;
+
+        homeMemo = new Memo { CreatedAt = date };
+        homeSchedule = new Schedule { Date = date };
+        homeAnniversary = new Anniversary { Date = date };
+
+        showForm = true;
+    }
+
+    private void SaveItem()
+    {
+        if (!selectedDate.HasValue) return;
+
+        if (selectedType == "Memo")
+        {
+            if (string.IsNullOrWhiteSpace(homeMemo.Title)) return;
+            homeMemo.CreatedAt = selectedDate.Value;
+            DataService.AddMemo(homeMemo);
+        }
+        else if (selectedType == "Schedule")
+        {
+            if (string.IsNullOrWhiteSpace(homeSchedule.Title)) return;
+            homeSchedule.Date = selectedDate.Value;
+            DataService.AddSchedule(homeSchedule);
+        }
+        else if (selectedType == "Anniversary")
+        {
+            if (string.IsNullOrWhiteSpace(homeAnniversary.Title)) return;
+            homeAnniversary.Date = selectedDate.Value;
+            DataService.AddAnniversary(homeAnniversary);
+        }
+
+        CancelForm();
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        homeMemo = new Memo();
+        homeSchedule = new Schedule();
+        homeAnniversary = new Anniversary();
+        selectedDate = null;
+    }
+
+    private void SelectType(string type)
+    {
+        selectedType = type;
+    }
+
+    private string GetTypeLabel()
+    {
+        return selectedType switch
+        {
+            "Memo" => "메모",
+            "Anniversary" => "기념일",
+            "Schedule" => "일정",
+            _ => "항목"
+        };
+    }
+
+    private int GetLoveDays()
+    {
+        // ✅ 여기만 네가 실제 사귄 날짜로 바꾸면 됨
+        var start = new DateTime(2024, 7, 14);
+        return (DateTime.Today - start).Days + 1;
+    }
+
+    public void Dispose()
+    {
+        DataService.OnChange -= OnDataChanged;
+    }
+}

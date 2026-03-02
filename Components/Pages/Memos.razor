@@ -1,0 +1,146 @@
+@page "/memos"
+@using Blazor_Serial_Test.Models
+@using Blazor_Serial_Test.Services
+@using Blazor_Serial_Test.Components.Shared
+@inject CoupleDataService DataService
+@implements IDisposable
+
+<PageTitle>메모</PageTitle>
+
+<h1>📝 메모</h1>
+
+<h2 class="mt-4 mb-3">캘린더</h2>
+<CalendarView ShowSchedules="false" ShowMemos="true" ShowAnniversaries="false" OnDateSelected="HandleDateSelected" />
+
+<h2 class="mt-5 mb-3">메모 목록</h2>
+
+<div class="row mb-3">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="ShowAddForm">새 메모 작성</button>
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@(editingMemo?.Id != Guid.Empty ? "메모 수정" : "새 메모")</h5>
+            <div class="mb-3">
+                <label class="form-label">제목</label>
+                <input type="text" class="form-control" @bind="currentMemo.Title" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">내용</label>
+                <textarea class="form-control" @bind="currentMemo.Content" rows="5"></textarea>
+            </div>
+            <button class="btn btn-success" @onclick="SaveMemo">저장</button>
+            <button class="btn btn-secondary" @onclick="CancelForm">취소</button>
+        </div>
+    </div>
+}
+
+<div class="row">
+    @foreach (var memo in memos)
+    {
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">@memo.Title</h5>
+                    <p class="card-text">@memo.Content</p>
+                    <small class="text-muted">
+                        @memo.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                        @if (memo.UpdatedAt.HasValue)
+                        {
+                            <span> (수정됨)</span>
+                        }
+                    </small>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-warning" @onclick="() => EditMemo(memo)">수정</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteMemo(memo.Id)">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Memo> memos = new();
+    private Memo currentMemo = new();
+    private Memo? editingMemo;
+    private bool showForm = false;
+
+    protected override void OnInitialized()
+    {
+        memos = DataService.GetMemos();
+        DataService.OnChange += OnDataChanged;
+    }
+
+    private void OnDataChanged()
+    {
+        memos = DataService.GetMemos();
+        StateHasChanged();
+    }
+
+    private void HandleDateSelected(DateTime date)
+    {
+        currentMemo = new Memo();
+        editingMemo = null;
+        showForm = true;
+    }
+
+    private void ShowAddForm()
+    {
+        currentMemo = new Memo();
+        editingMemo = null;
+        showForm = true;
+    }
+
+    private void EditMemo(Memo memo)
+    {
+        editingMemo = memo;
+        currentMemo = new Memo
+        {
+            Id = memo.Id,
+            Title = memo.Title,
+            Content = memo.Content,
+            CreatedAt = memo.CreatedAt,
+            UpdatedAt = memo.UpdatedAt
+        };
+        showForm = true;
+    }
+
+    private void SaveMemo()
+    {
+        if (string.IsNullOrWhiteSpace(currentMemo.Title))
+            return;
+
+        if (editingMemo != null)
+        {
+            DataService.UpdateMemo(currentMemo);
+        }
+        else
+        {
+            DataService.AddMemo(currentMemo);
+        }
+
+        CancelForm();
+    }
+
+    private void DeleteMemo(Guid id)
+    {
+        DataService.DeleteMemo(id);
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        currentMemo = new();
+        editingMemo = null;
+    }
+
+    public void Dispose()
+    {
+        DataService.OnChange -= OnDataChanged;
+    }
+}

@@ -1,0 +1,171 @@
+@page "/anniversaries"
+@using Blazor_Serial_Test.Models
+@using Blazor_Serial_Test.Services
+@using Blazor_Serial_Test.Components.Shared
+@inject CoupleDataService DataService
+@implements IDisposable
+
+<PageTitle>기념일</PageTitle>
+
+<h1>💕 기념일</h1>
+
+<h2 class="mt-4 mb-3">캘린더</h2>
+<CalendarView ShowSchedules="false" ShowMemos="false" ShowAnniversaries="true" OnDateSelected="HandleDateSelected" />
+
+<h2 class="mt-5 mb-3">기념일 목록</h2>
+
+<div class="row mb-3">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="ShowAddForm">새 기념일 추가</button>
+    </div>
+</div>
+
+@if (showForm)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@(editingAnniversary?.Id != Guid.Empty ? "기념일 수정" : "새 기념일")</h5>
+            <div class="mb-3">
+                <label class="form-label">제목</label>
+                <input type="text" class="form-control" @bind="currentAnniversary.Title" 
+                       placeholder="예: 처음 만난 날, 결혼 기념일" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">날짜</label>
+                <input type="date" class="form-control" @bind="currentAnniversary.Date" />
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" @bind="currentAnniversary.IsRecurring" />
+                <label class="form-check-label">매년 반복</label>
+            </div>
+            <button class="btn btn-success" @onclick="SaveAnniversary">저장</button>
+            <button class="btn btn-secondary" @onclick="CancelForm">취소</button>
+        </div>
+    </div>
+}
+
+<div class="row">
+    @foreach (var anniversary in anniversaries)
+    {
+        var daysUntil = anniversary.DaysUntil();
+        var cardClass = daysUntil <= 7 ? "border-danger" : "";
+
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card @cardClass">
+                <div class="card-body">
+                    <h5 class="card-title">@anniversary.Title</h5>
+                    <p class="card-text">
+                        <strong>날짜:</strong> @anniversary.Date.ToString("yyyy-MM-dd")<br />
+                        @if (anniversary.IsRecurring)
+                        {
+                            <span class="badge bg-info">매년 반복</span>
+                        }
+                    </p>
+                    @if (daysUntil == 0)
+                    {
+                        <div class="alert alert-success mb-2" role="alert">
+                            🎉 오늘입니다!
+                        </div>
+                    }
+                    else if (daysUntil > 0)
+                    {
+                        <div class="alert alert-info mb-2" role="alert">
+                            D-@daysUntil
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-secondary mb-2" role="alert">
+                            @Math.Abs(daysUntil)일 지남
+                        </div>
+                    }
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-warning" @onclick="() => EditAnniversary(anniversary)">수정</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteAnniversary(anniversary.Id)">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Anniversary> anniversaries = new();
+    private Anniversary currentAnniversary = new();
+    private Anniversary? editingAnniversary;
+    private bool showForm = false;
+
+    protected override void OnInitialized()
+    {
+        anniversaries = DataService.GetAnniversaries();
+        DataService.OnChange += OnDataChanged;
+    }
+
+    private void OnDataChanged()
+    {
+        anniversaries = DataService.GetAnniversaries();
+        StateHasChanged();
+    }
+
+    private void HandleDateSelected(DateTime date)
+    {
+        currentAnniversary = new Anniversary { Date = date };
+        editingAnniversary = null;
+        showForm = true;
+    }
+
+    private void ShowAddForm()
+    {
+        currentAnniversary = new Anniversary();
+        editingAnniversary = null;
+        showForm = true;
+    }
+
+    private void EditAnniversary(Anniversary anniversary)
+    {
+        editingAnniversary = anniversary;
+        currentAnniversary = new Anniversary
+        {
+            Id = anniversary.Id,
+            Title = anniversary.Title,
+            Date = anniversary.Date,
+            IsRecurring = anniversary.IsRecurring,
+            RecurrenceType = anniversary.RecurrenceType
+        };
+        showForm = true;
+    }
+
+    private void SaveAnniversary()
+    {
+        if (string.IsNullOrWhiteSpace(currentAnniversary.Title))
+            return;
+
+        if (editingAnniversary != null)
+        {
+            DataService.UpdateAnniversary(currentAnniversary);
+        }
+        else
+        {
+            DataService.AddAnniversary(currentAnniversary);
+        }
+
+        CancelForm();
+    }
+
+    private void DeleteAnniversary(Guid id)
+    {
+        DataService.DeleteAnniversary(id);
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        currentAnniversary = new();
+        editingAnniversary = null;
+    }
+
+    public void Dispose()
+    {
+        DataService.OnChange -= OnDataChanged;
+    }
+}
