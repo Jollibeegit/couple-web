@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Blazor_Serial_Test")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c6647c5bd1bd80ddf6ea6614ebfe032aa5ef9b38")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d5a35caf3c0ce469b37e98ae30fea40238a3383")]
 [assembly: System.Reflection.AssemblyProductAttribute("Blazor_Serial_Test")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Blazor_Serial_Test")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
